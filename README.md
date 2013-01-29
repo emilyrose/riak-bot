@@ -11,18 +11,18 @@
 
 // instantiate
 var
-  rb = require('riak-bot')
-  , node = new rb({ 
-  
-    bind : '0.0.0.0'
-  	, host : '127.0.0.1'
-  	, name : 'ohai'
-  	, key : 'riak'
-  	, directory: './'
-});
+	rb = require('riak-bot')
+ 	, node = new rb({ 
+		bind : '0.0.0.0'
+		, host : '127.0.0.1'
+		, name : 'ohai'
+		, key : 'riak' // ring cookie
+		, directory: './' // config path
+	})
+;
 
 // update some stuff maybe?
-node.set('name', 'dafdsff')
+node.set('name', 'riak');
 
 // write the configs
 node.configure();
@@ -31,6 +31,5 @@ node.configure();
 node.on('error', function(err) { 
 
 	console.log([ '[', (new Date()).toLocaleString(), '] ', err ].join(''));
-
 });
 ```
