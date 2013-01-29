@@ -1,0 +1,19 @@
+{
+  "name": "riak-bot",
+  "version": "0.0.0",
+  "description": "riak node discovery & auto clustering",
+  "main": "index.js",
+  "repository": "",
+  "keywords": [
+    "riak",
+    "discovery",
+    "auto",
+    "cluster"
+  ],
+  "author": "Emily Rose <emily@contactvibe.com>",
+  "license": "BSD",
+  "dependencies": {
+    "ejs": "~0.8.3",
+    "disco-maps": "0.0.0"
+  }
+}
