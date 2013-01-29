@@ -1,4 +1,4 @@
 # riak-bot
-## riak node discovery & auto clustering
+## riak node configuration, discovery & auto clustering
 
 // TODO: node reip, cluster join/plan/commit
