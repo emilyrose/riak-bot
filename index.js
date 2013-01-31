@@ -13,7 +13,11 @@ var
 function bot(opts) {
 	
 
-	var opts = this.opts = opts || { };
+	var 
+		opts = this.opts = opts || { }
+		, params = { }
+		, self = this
+	;
 
 	if(!opts.directory) { 
 
@@ -21,6 +25,7 @@ function bot(opts) {
 	}
 
 	stream.call(this);
+
 	var 
 		name = function() { 
 
@@ -30,7 +35,7 @@ function bot(opts) {
 
 	function gen() {
 
-		params = {
+		self.params = {
 
 			name : name()
 			, cookie : opts.key
@@ -39,12 +44,12 @@ function bot(opts) {
 
 		}
 
-		return this;
+		return self;
 	}
 
 	this.compile = function(str) {
 		
-		return ejs.render(str, params) || undefined;
+		return ejs.render(str, this.params) || undefined;
 	};
 
 	this.write = function(str, tpl) {
@@ -60,6 +65,138 @@ function bot(opts) {
 };
 
 util.inherits(bot, stream);
+
+
+bot.prototype.cluster = function cluster(action, cb) {
+
+	exec(util.format('riak-admin cluster %s', action), cb);
+};
+
+bot.prototype.up = function(cb) {
+	
+	var rb = this;
+	(exec('riak start', function(err, stdout, stderr) {
+
+		if(err) { 
+
+			cb(err, false);
+			return error(err); 
+		}
+		rb.emit('up', true);
+		console.log("Riak up!");
+		return cb(null, true);
+	})());
+
+};
+
+bot.prototype.down = function(cb) {
+	
+	var rb = this;
+	exec('riak stop', function(err, stdout, stderr) {
+
+		if(err) { return error(err); }
+		if(stdout.indexOf("ok") !== -1) {
+
+			rb.emit('down', true);
+			console.log("Riak down...");
+			return cb(null, true);
+		}
+		return cb("Unable to bring riak down", false);
+	});
+};
+
+bot.prototype.kill = function(cb) {
+	
+	exec("ps aux | grep riak | awk '{print $2}' | xargs kill", killed);
+	function killed(err, stdout, stderr) {
+
+		console.log(">> %s", stdout);
+		if(!err) {
+
+			return cb(null, true);
+		}
+		cb(err, false);
+	}
+};
+bot.prototype.join = function join(node, cb) {
+
+	this.cluster('join ' + node, cb);
+};
+
+bot.prototype.commit = function commit(cb) {
+
+	this.cluster('commit', cb);
+};
+
+bot.prototype.leave = function leave(cb) {
+
+	this.cluster('leave', cb);
+};
+
+bot.prototype.reip = function reip(cb) {
+
+	var rb = this;
+
+	console.log(rb.oldName, " -> ", rb.params.name);
+	exec(
+
+		util.format('riak-admin reip %s %s', rb.oldName, rb.params.name)
+		, reipDone
+	);
+
+	function reipDone(err, stdout, stderr) {
+
+		console.log(">> %s", stdout || null);
+		if((!err) && stdout.indexOf("New ring file written") !== -1) {
+
+			rb.emit('reip', true);
+			console.log("reip success");
+			return cb(null, rb.params.name);
+		}
+		if(err) {
+
+			if(stdout.indexOf("Node must be down") !== -1) {
+
+				return cb("Node online", null);
+			}
+			return cb(err, null)
+		}
+		cb("Reip failed", false);
+		rb.emit('reip', false);
+	}
+};
+
+bot.prototype.getOldName = function(cb) {
+
+	var rb = this;
+	exec(
+
+		util.format(
+
+			'cat %s | grep name'
+			, path.resolve(rb.opts.directory, 'vm.args')
+		)
+		, function(err, stdout, stderr) {
+
+			if(err) { 
+
+				cb(err, undefined);
+				return rb.error(err); 
+			}
+
+			if((stdout) && stdout.indexOf("@") !== -1) {
+
+				return cb(
+
+					null
+					, rb.oldName = stdout.split(" ")[1].replace(/[\r\n]/g, "")
+				);
+				rb.emit('oldname', rb.oldName);
+			}
+			cb("Invalid vm.args", undefined);
+		}
+	);
+};
 
 /**
  * Write config & args to the specified directory
