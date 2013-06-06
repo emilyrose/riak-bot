@@ -2,6 +2,7 @@ var
 	fs = require('fs')
 	, ejs = require('ejs')
 	, exec = require('child_process').exec
+	, request = require('request')
 	, stream = require('stream')
 	, path = require('path')
 	, util = require('util')
@@ -75,7 +76,7 @@ bot.prototype.cluster = function cluster(action, cb) {
 bot.prototype.up = function(cb) {
 	
 	var rb = this;
-	(exec('riak start', function(err, stdout, stderr) {
+	exec('riak start', function(err, stdout, stderr) {
 
 		if(err) { 
 
@@ -85,7 +86,7 @@ bot.prototype.up = function(cb) {
 		rb.emit('up', true);
 		console.log("Riak up!");
 		return cb(null, true);
-	})());
+	});
 
 };
 
@@ -118,11 +119,46 @@ bot.prototype.kill = function(cb) {
 		cb(err, false);
 	}
 };
+
 bot.prototype.join = function join(node, cb) {
 
-	this.cluster('join ' + node, cb);
+	var rb = this;
+	if((this.ring) && this.ring.indexOf(node)) {
+
+		return console.log("Already part of a ring with this node");
+	}
+	this.cluster('join ' + node, function(err, stdout, stderr) {
+
+		if(err) {
+
+			if(stdout.indexOf("already a member")) {
+
+				return console.log("This node is already in cluster");
+			}
+			rb.error(err);
+			return;
+		}
+		if((stdout) && stdout.indexOf("staged leave request")) {
+
+			rb.plan(function(err, stdout, stderr) { 
+
+				if(err) { return rb.error(err); }
+				else { console.log("Connecting cluster..."); }
+				
+				rb.commit(cb);
+			});
+		}
+		else {
+
+			console.log("cluster join problem: %s", stdout);
+		}
+	});
 };
 
+bot.prototype.plan = function(cb) {
+
+	this.cluster('plan', cb);
+};
 bot.prototype.commit = function commit(cb) {
 
 	this.cluster('commit', cb);
@@ -198,6 +234,33 @@ bot.prototype.getOldName = function(cb) {
 	);
 };
 
+bot.prototype.stats = function stats(cb) {
+	
+	var rb = this;
+	request("http://127.0.0.1:8098/stats", function(err, res, body) {
+
+		if(!err && res.statusCode == 200) {
+
+			try {
+
+				var json = getJSON(body)
+			}
+			catch(e) {
+
+				cb(e, null);
+				return error(e);
+			}
+
+			var ring = json.ring_members;
+			if(ring) {
+
+				rb.ring = ring;
+				return cb(null, ring);
+			}
+		}
+		cb(err, null);
+	});
+};
 /**
  * Write config & args to the specified directory
  */
@@ -253,6 +316,19 @@ bot.prototype.error = function error() {
 	;
 	// TODO: something useful.
 	this.emit('error', err);	
+};
+
+function getJSON(json) {
+
+	try {
+
+		var j = JSON.parse(json, null, "\t");
+	}
+	catch(e) {
+
+		return null;
+	}
+	return j;
 };
 
 module.exports = bot;
