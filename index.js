@@ -22,15 +22,29 @@ function bot(opts) {
 
 	if(!opts.directory) { 
 
-		return this.error("No riak directory provided."); 
+		throw("No riak directory provided."); 
 	}
 
+	if(!opts.name) {
+
+		throw("No riak name provided.");
+	}
+
+	if(!opts.host) {
+
+		throw("No host provided.");
+	}
+
+	if(!opts.key) {
+
+		throw("No key provided");
+	}
 	stream.call(this);
 
 	var 
 		name = function() { 
 
-			return [ opts.name, '@', opts.host ].join('') 
+			return [ opts.name, '@', opts.host ].join('');
 		}
 	;
 
@@ -43,7 +57,7 @@ function bot(opts) {
 			, bind : opts.bind
 			, host : opts.host
 
-		}
+		};
 
 		return self;
 	}
@@ -61,9 +75,9 @@ function bot(opts) {
 		});
 	};
 
-	this.update = function() { return gen(); }
+	this.update = function() { return gen(); };
 	gen();
-};
+}
 
 util.inherits(bot, stream);
 
