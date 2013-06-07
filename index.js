@@ -93,10 +93,18 @@ bot.prototype.up = function(cb) {
 	exec('riak start', function(err, stdout, stderr) {
 
 		if(err) { 
+			if(stdout && ~stdout.indexOf("already running")) {
 
-			cb(err, false);
-			return error(err); 
+				console.log("Riak is already up!");
+				return cb(null, true);
+			} else {
+
+				cb(err, false);
+				console.log("stdout: " + stdout);
+				return bot.error(err); 
+			}
 		}
+
 		rb.emit('up', true);
 		console.log("Riak up!");
 		return cb(null, true);
@@ -120,6 +128,7 @@ bot.prototype.down = function(cb) {
 	});
 };
 
+// TODO - Can we use 'killall' instead?
 bot.prototype.kill = function(cb) {
 	
 	exec("ps aux | grep riak | awk '{print $2}' | xargs kill", killed);
