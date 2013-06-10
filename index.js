@@ -93,20 +93,15 @@ bot.prototype.up = function(cb) {
 	exec('riak start', function(err, stdout, stderr) {
 
 		if(err) { 
-			if(stdout && ~stdout.indexOf("already running")) {
-
-				console.log("Riak is already up!");
-				return cb(null, true);
-			} else {
+			if(!stdout || !~stdout.indexOf("already running")) {
 
 				cb(err, false);
-				console.log("stdout: " + stdout);
-				return bot.error(err); 
+				return rb.error(err); 
 			}
 		}
 
+		console.log("Riak up...");
 		rb.emit('up', true);
-		console.log("Riak up!");
 		return cb(null, true);
 	});
 
@@ -119,20 +114,31 @@ bot.prototype.down = function(cb) {
 
 		if(err) { 
 			if(stdout && ~stdout.indexOf("not responding")) {
-				console.log("Riak is already down!");
+
+				// Riak is already down.
+				console.log("Riak down...");
+				rb.emit('down', true);
 				return cb(null, true);
 			} else {
+
+				cb(err, false);
 				return rb.error(err);
 			}
 		}
 
+		// Riak was up, but is now down.
 		if(stdout.indexOf("ok") !== -1) {
 
-			rb.emit('down', true);
 			console.log("Riak down...");
+			rb.emit('down', true);
 			return cb(null, true);
+		} else {
+
+			var errmsg = "Unable to bring riak down";
+			cb(errmsg, false);
+			return rb.error(errmsg);
 		}
-		return cb("Unable to bring riak down", false);
+
 	});
 };
 
