@@ -117,7 +117,15 @@ bot.prototype.down = function(cb) {
 	var rb = this;
 	exec('riak stop', function(err, stdout, stderr) {
 
-		if(err) { return error(err); }
+		if(err) { 
+			if(stdout && ~stdout.indexOf("not responding")) {
+				console.log("Riak is already down!");
+				return cb(null, true);
+			} else {
+				return rb.error(err);
+			}
+		}
+
 		if(stdout.indexOf("ok") !== -1) {
 
 			rb.emit('down', true);
