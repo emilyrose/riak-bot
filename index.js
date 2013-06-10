@@ -158,35 +158,48 @@ bot.prototype.kill = function(cb) {
 
 bot.prototype.join = function join(node, cb) {
 
-	var rb = this;
-	if((this.ring) && this.ring.indexOf(node)) {
+	var msg
+		, rb = this
+	;
 
-		return console.log("Already part of a ring with this node");
+	if(this.ring && ~this.ring.indexOf(node)) {
+		msg = "This node is already part of a ring.";
+		console.log(msg);
+		rb.error(msg);
+		return cb(msg);
 	}
+
 	this.cluster('join ' + node, function(err, stdout, stderr) {
 
 		if(err) {
 
 			if(stdout.indexOf("already a member")) {
-
-				return console.log("This node is already in cluster");
+				msg = "This node is already in cluster.";
+				rb.error(msg);
+				return cb(msg);
 			}
 			rb.error(err);
-			return;
+			return cb(err);
 		}
 		if((stdout) && stdout.indexOf("staged leave request")) {
 
-			rb.plan(function(err, stdout, stderr) { 
+			rb.plan(function(err, stdout, stderr) {
 
-				if(err) { return rb.error(err); }
-				else { console.log("Connecting cluster..."); }
-				
+				if(err) { 
+
+					rb.error(err);
+					return cb(err);
+				}
+
+				console.log("Attempting to join cluster...");
 				rb.commit(cb);
 			});
 		}
 		else {
 
 			console.log("cluster join problem: %s", stdout);
+			rb.error(stdout);
+			return cb(stdout);
 		}
 	});
 };
@@ -195,6 +208,7 @@ bot.prototype.plan = function(cb) {
 
 	this.cluster('plan', cb);
 };
+
 bot.prototype.commit = function commit(cb) {
 
 	this.cluster('commit', cb);
