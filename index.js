@@ -87,6 +87,16 @@ bot.prototype.cluster = function cluster(action, cb) {
 	exec(util.format('riak-admin cluster %s', action), cb);
 };
 
+bot.prototype.plan = function(cb) {
+
+	this.cluster('plan', cb);
+};
+
+bot.prototype.commit = function commit(cb) {
+
+	this.cluster('commit', cb);
+};
+
 bot.prototype.up = function(cb) {
 	
 	var rb = this;
@@ -204,19 +214,36 @@ bot.prototype.join = function join(node, cb) {
 	});
 };
 
-bot.prototype.plan = function(cb) {
-
-	this.cluster('plan', cb);
-};
-
-bot.prototype.commit = function commit(cb) {
-
-	this.cluster('commit', cb);
-};
-
 bot.prototype.leave = function leave(cb) {
 
-	this.cluster('leave', cb);
+	var rb = this;
+
+	this.cluster('leave', function(err, stdout, stderr) {
+		if(err) {
+			console.log("Err: " + err);
+		}
+
+		if((stdout) && stdout.indexOf("staged leave request")) {
+
+			rb.plan(function(err, stdout, stderr) {
+
+				if(err) { 
+
+					rb.error(err);
+					return cb(err);
+				}
+
+				console.log("Attempting to leave cluster...");
+				rb.commit(cb);
+			});
+		}
+		else {
+
+			console.log("cluster leave problem: %s", stdout);
+			rb.error(stdout);
+			return cb(stdout);
+		}
+	});
 };
 
 bot.prototype.reip = function reip(cb) {
