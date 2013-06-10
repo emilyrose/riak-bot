@@ -142,13 +142,12 @@ bot.prototype.down = function(cb) {
 	});
 };
 
-// TODO - Can we use 'killall' instead?
 bot.prototype.kill = function(cb) {
 	
-	exec("ps aux | grep riak | awk '{print $2}' | xargs kill", killed);
+	exec("ps aux | grep [r]iak | awk '{print $2}' | xargs kill", killed);
+
 	function killed(err, stdout, stderr) {
 
-		console.log(">> %s", stdout);
 		if(!err) {
 
 			return cb(null, true);
