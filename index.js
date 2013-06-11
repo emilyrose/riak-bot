@@ -8,12 +8,8 @@ var
 	, util = require('util')
 ;
 
-/**
- * TODO: options object and actual options parsing
- */
 function bot(opts) {
 	
-
 	var 
 		opts = this.opts = opts || { }
 		, params = { }
