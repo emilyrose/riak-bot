@@ -8,12 +8,8 @@ var
 	, util = require('util')
 ;
 
-/**
- * TODO: options object and actual options parsing
- */
 function bot(opts) {
 	
-
 	var 
 		opts = this.opts = opts || { }
 		, params = { }
@@ -22,15 +18,29 @@ function bot(opts) {
 
 	if(!opts.directory) { 
 
-		return this.error("No riak directory provided."); 
+		throw("No riak directory provided."); 
 	}
 
+	if(!opts.name) {
+
+		throw("No riak name provided.");
+	}
+
+	if(!opts.host) {
+
+		throw("No host provided.");
+	}
+
+	if(!opts.key) {
+
+		throw("No key provided");
+	}
 	stream.call(this);
 
 	var 
 		name = function() { 
 
-			return [ opts.name, '@', opts.host ].join('') 
+			return [ opts.name, '@', opts.host ].join('');
 		}
 	;
 
@@ -43,7 +53,7 @@ function bot(opts) {
 			, bind : opts.bind
 			, host : opts.host
 
-		}
+		};
 
 		return self;
 	}
@@ -61,9 +71,9 @@ function bot(opts) {
 		});
 	};
 
-	this.update = function() { return gen(); }
+	this.update = function() { return gen(); };
 	gen();
-};
+}
 
 util.inherits(bot, stream);
 
@@ -73,18 +83,31 @@ bot.prototype.cluster = function cluster(action, cb) {
 	exec(util.format('riak-admin cluster %s', action), cb);
 };
 
+bot.prototype.plan = function(cb) {
+
+	this.cluster('plan', cb);
+};
+
+bot.prototype.commit = function commit(cb) {
+
+	this.cluster('commit', cb);
+};
+
 bot.prototype.up = function(cb) {
 	
 	var rb = this;
 	exec('riak start', function(err, stdout, stderr) {
 
 		if(err) { 
+			if(!stdout || !~stdout.indexOf("already running")) {
 
-			cb(err, false);
-			return error(err); 
+				cb(err, false);
+				return rb.error(err); 
+			}
 		}
+
+		console.log("Riak up...");
 		rb.emit('up', true);
-		console.log("Riak up!");
 		return cb(null, true);
 	});
 
@@ -95,23 +118,42 @@ bot.prototype.down = function(cb) {
 	var rb = this;
 	exec('riak stop', function(err, stdout, stderr) {
 
-		if(err) { return error(err); }
+		if(err) { 
+			if(stdout && ~stdout.indexOf("not responding")) {
+
+				// Riak is already down.
+				console.log("Riak down...");
+				rb.emit('down', true);
+				return cb(null, true);
+			} else {
+
+				cb(err, false);
+				return rb.error(err);
+			}
+		}
+
+		// Riak was up, but is now down.
 		if(stdout.indexOf("ok") !== -1) {
 
-			rb.emit('down', true);
 			console.log("Riak down...");
+			rb.emit('down', true);
 			return cb(null, true);
+		} else {
+
+			var errmsg = "Unable to bring riak down";
+			cb(errmsg, false);
+			return rb.error(errmsg);
 		}
-		return cb("Unable to bring riak down", false);
+
 	});
 };
 
 bot.prototype.kill = function(cb) {
 	
-	exec("ps aux | grep riak | awk '{print $2}' | xargs kill", killed);
+	exec("ps aux | grep [r]iak | awk '{print $2}' | xargs kill", killed);
+
 	function killed(err, stdout, stderr) {
 
-		console.log(">> %s", stdout);
 		if(!err) {
 
 			return cb(null, true);
@@ -122,51 +164,82 @@ bot.prototype.kill = function(cb) {
 
 bot.prototype.join = function join(node, cb) {
 
-	var rb = this;
-	if((this.ring) && this.ring.indexOf(node)) {
+	var msg
+		, rb = this
+	;
 
-		return console.log("Already part of a ring with this node");
+	if(this.ring && ~this.ring.indexOf(node)) {
+		msg = "This node is already part of a ring.";
+		console.log(msg);
+		rb.error(msg);
+		return cb(msg);
 	}
+
 	this.cluster('join ' + node, function(err, stdout, stderr) {
 
 		if(err) {
 
 			if(stdout.indexOf("already a member")) {
-
-				return console.log("This node is already in cluster");
+				msg = "This node is already in cluster.";
+				rb.error(msg);
+				return cb(msg);
 			}
 			rb.error(err);
-			return;
+			return cb(err);
 		}
 		if((stdout) && stdout.indexOf("staged leave request")) {
 
-			rb.plan(function(err, stdout, stderr) { 
+			rb.plan(function(err, stdout, stderr) {
 
-				if(err) { return rb.error(err); }
-				else { console.log("Connecting cluster..."); }
-				
+				if(err) { 
+
+					rb.error(err);
+					return cb(err);
+				}
+
+				console.log("Attempting to join cluster...");
 				rb.commit(cb);
 			});
 		}
 		else {
 
 			console.log("cluster join problem: %s", stdout);
+			rb.error(stdout);
+			return cb(stdout);
 		}
 	});
 };
 
-bot.prototype.plan = function(cb) {
-
-	this.cluster('plan', cb);
-};
-bot.prototype.commit = function commit(cb) {
-
-	this.cluster('commit', cb);
-};
-
 bot.prototype.leave = function leave(cb) {
 
-	this.cluster('leave', cb);
+	var rb = this;
+
+	this.cluster('leave', function(err, stdout, stderr) {
+		if(err) {
+			console.log("Err: " + err);
+		}
+
+		if((stdout) && stdout.indexOf("staged leave request")) {
+
+			rb.plan(function(err, stdout, stderr) {
+
+				if(err) { 
+
+					rb.error(err);
+					return cb(err);
+				}
+
+				console.log("Attempting to leave cluster...");
+				rb.commit(cb);
+			});
+		}
+		else {
+
+			console.log("cluster leave problem: %s", stdout);
+			rb.error(stdout);
+			return cb(stdout);
+		}
+	});
 };
 
 bot.prototype.reip = function reip(cb) {
