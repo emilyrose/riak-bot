@@ -1,6 +1,6 @@
 {
   "name": "riak-bot",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "riak node configuration, discovery & auto clustering",
   "main": "index.js",
   "repository": "",
