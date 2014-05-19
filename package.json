@@ -10,7 +10,10 @@
     "auto",
     "cluster"
   ],
-  "author": "Emily Rose <emily@contactvibe.com>",
+  "contributors": [
+    "Emily Rose <emily@contactvibe.com>",
+    "Adam Ulvi <adam@pokemedia.com>"
+  ],
   "license": "BSD",
   "dependencies": {
     "ejs": "~0.8.3",
